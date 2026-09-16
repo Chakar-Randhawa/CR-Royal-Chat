@@ -1,0 +1,6 @@
+{
+  "name": "Relay",
+  "description": "Privacy-first, end-to-end encrypted messaging application with real-time conversations, voice notes, and media sharing.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
