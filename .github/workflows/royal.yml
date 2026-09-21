@@ -25,7 +25,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # <-- Yahan sirf '20' se badal kar '22' kiya hai aapka error fix karne ke liye
           cache: 'npm'
 
       - name: Install web app dependencies
