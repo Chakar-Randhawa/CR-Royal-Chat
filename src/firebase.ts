@@ -5,12 +5,8 @@
 // `.env.example` to `.env` and fill in the values from your Firebase
 // project (Project settings -> General -> Your apps -> Web app).
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import {
-  getAuth,
-  setPersistence,
-  browserLocalPersistence,
-} from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -33,7 +29,17 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Firestore's default network transport uses HTTP/2 streaming, which
+// Android's WebView (what the packaged APK runs inside, via Capacitor)
+// often cannot sustain reliably — the symptom is a
+// "Failed to get document because the client is offline" error even
+// though the device has a real internet connection. Auto-detecting and
+// falling back to long-polling avoids that; it's a no-op (works exactly
+// the same) in a normal desktop/mobile browser.
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 
 // Keep the user signed in across page reloads / browser restarts.
 setPersistence(auth, browserLocalPersistence).catch(() => {
