@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { RelayMessage, MessageReply } from '../../types';
-import { RelayReceipt } from '../common/RelayReceipt';
+import { Message, MessageReply } from '../../types';
+import { RoyalChatReceipt } from '../common/RoyalChatReceipt';
 import { LiveWaveform } from './LiveWaveform';
 import { MessageContextMenu } from './MessageContextMenu';
-import { MoreVertical, Star, Ban } from 'lucide-react';
+import { MoreVertical, Star, Ban, Lock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 interface MessageBubbleProps {
-  message: RelayMessage;
+  message: Message;
   conversationId: string;
   onReplyTarget: (target: MessageReply) => void;
   onOpenMedia?: (assetUrl: string) => void;
@@ -101,6 +101,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Ban className="w-3.5 h-3.5" />
               <span>This message was deleted</span>
             </div>
+          ) : message.decryptFailed ? (
+            <div className="flex items-center gap-1.5 text-xs italic text-[#8C9BA5] py-0.5">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Unable to decrypt this message</span>
+            </div>
           ) : (
             <>
               {/* Image attachment */}
@@ -119,7 +124,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {/* Voice note */}
               {message.kind === 'voice' && (
                 <LiveWaveform
-                  durationSeconds={message.voiceDuration || 18}
+                  asset={message.asset}
+                  durationSeconds={message.voiceDuration || 0}
                   isMine={mine}
                 />
               )}
@@ -139,7 +145,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
             )}
             <span>{message.sentAt}</span>
-            {mine && <RelayReceipt stage={message.delivery || 'sent'} size={13} />}
+            {mine && <RoyalChatReceipt stage={message.delivery || 'sent'} size={13} />}
           </div>
         </div>
 

@@ -1,95 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { RelayMark } from '../common/RelayMark';
-import { RelayButton } from '../common/RelayButton';
-import { RelayAvatar } from '../common/RelayAvatar';
-import { ArrowLeft, ShieldCheck, ChevronDown, Check, Camera } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { RoyalChatMark } from '../common/RoyalChatMark';
+import { RoyalChatButton } from '../common/RoyalChatButton';
+import { Eye, EyeOff, ShieldCheck, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-
-const COUNTRIES = [
-  { name: 'Bangladesh', code: '+880', flag: '🇧🇩' },
-  { name: 'United States', code: '+1', flag: '🇺🇸' },
-  { name: 'United Kingdom', code: '+44', flag: '🇬🇧' },
-  { name: 'Canada', code: '+1', flag: '🇨🇦' },
-  { name: 'Germany', code: '+49', flag: '🇩🇪' },
-  { name: 'India', code: '+91', flag: '🇮🇳' },
-  { name: 'Pakistan', code: '+92', flag: '🇵🇰' },
-  { name: 'United Arab Emirates', code: '+971', flag: '🇦🇪' },
-];
+import { validateUsername } from '../../lib/username';
 
 export const AuthFlow: React.FC = () => {
-  const { authStep, setAuthStep, currentUser, updateProfile, showToast } = useApp();
+  const { authStep, setAuthStep, authLoading, authError, signUp, logIn } = useApp();
 
-  // Phone state
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [phoneInput, setPhoneInput] = useState('1711234567');
-  const [countrySearch, setCountrySearch] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // OTP state
-  const [otpCode, setOtpCode] = useState(['5', '2', '8', '', '', '']);
-  const [resendCountdown, setResendCountdown] = useState(30);
-
-  // Profile setup state
-  const [profileName, setProfileName] = useState(currentUser.displayName || 'Navid');
-  const [profileAbout, setProfileAbout] = useState(
-    currentUser.about || 'Available on Relay'
-  );
-
-  // Countdown timer for OTP
+  // Clear the form's own validation error whenever the user edits a
+  // field again, or when the shared auth flow reports a fresh error.
   useEffect(() => {
-    let timer: number | null = null;
-    if (authStep === 'otp' && resendCountdown > 0) {
-      timer = window.setInterval(() => {
-        setResendCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [authStep, resendCountdown]);
+    setFormError(null);
+  }, [authStep]);
 
-  const handlePhoneSubmit = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phoneInput.trim().length < 6) {
-      showToast('Please enter a valid phone number', 'info');
+    setFormError(null);
+
+    if (!email.trim() || !email.includes('@')) {
+      setFormError('Please enter a valid email address (Gmail, Outlook, Hotmail, or any provider).');
       return;
     }
-    setResendCountdown(30);
-    setAuthStep('otp');
-  };
-
-  const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) val = val[val.length - 1];
-    const updated = [...otpCode];
-    updated[index] = val;
-    setOtpCode(updated);
-
-    // Auto-focus next input
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      nextInput?.focus();
-    }
-  };
-
-  const handleOtpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthStep('profile');
-  };
-
-  const handleProfileSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profileName.trim()) {
-      showToast('Please enter your name', 'info');
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+      setFormError(usernameError);
       return;
     }
-    updateProfile({
-      displayName: profileName.trim(),
-      about: profileAbout.trim(),
-      phoneNumber: `${selectedCountry.code} ${phoneInput.trim()}`,
-    });
-    setAuthStep('complete');
-    showToast('Welcome to Relay!', 'check');
+    if (password.length < 6) {
+      setFormError('Password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      await signUp({
+        email: email.trim(),
+        password,
+        username: username.trim(),
+        displayName: displayName.trim() || username.trim(),
+      });
+    } catch {
+      // authError is already set by the context; nothing else to do.
+    }
   };
+
+  const handleLogIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    if (!email.trim() || !password) {
+      setFormError('Please enter your email and password.');
+      return;
+    }
+    try {
+      await logIn({ email: email.trim(), password });
+    } catch {
+      // authError is already set by the context; nothing else to do.
+    }
+  };
+
+  const combinedError = formError || authError;
 
   // 1. Splash Screen
   if (authStep === 'splash') {
@@ -97,256 +73,228 @@ export const AuthFlow: React.FC = () => {
       <div className="flex flex-col items-center justify-between min-h-screen p-8 bg-[#F8F8F5] dark:bg-[#141B20] text-center select-none">
         <div className="w-full" />
         <div className="flex flex-col items-center max-w-sm">
-          <RelayMark size={84} />
+          <RoyalChatMark size={84} />
           <h1 className="text-3xl font-extrabold tracking-tight text-[#202A30] dark:text-[#F4F5F2] mt-6">
-            Relay
+            Royal Chat
           </h1>
           <p className="text-sm font-medium text-[#68747A] dark:text-[#ACB7BD] mt-2">
-            Fast, private messaging.
+            Fast, free, real-time messaging.
           </p>
           <div className="flex items-center gap-1.5 px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full text-xs text-[#10B981] font-semibold mt-4">
             <ShieldCheck className="w-4 h-4" />
-            <span>Zero-Knowledge E2EE</span>
+            <span>Sign up with just an email — no phone number</span>
           </div>
         </div>
 
         <div className="w-full max-w-xs space-y-3">
-          <RelayButton onClick={() => setAuthStep('phone')}>
-            Get Started
-          </RelayButton>
+          <RoyalChatButton onClick={() => setAuthStep('signup')}>Create account</RoyalChatButton>
+          <button
+            onClick={() => setAuthStep('login')}
+            className="w-full py-2.5 text-sm font-semibold text-[#F05D48] hover:underline"
+          >
+            I already have an account
+          </button>
           <p className="text-[11px] text-[#8C9BA5]">
-            By tapping Get Started, you agree to our Terms & Privacy Policy.
+            By continuing, you agree to our Terms & Privacy Policy.
           </p>
         </div>
       </div>
     );
   }
 
-  // 2. Phone Entry Screen
-  if (authStep === 'phone') {
+  // 2. Sign Up Screen — email + username + password only, no OTP.
+  if (authStep === 'signup') {
     return (
       <div className="flex flex-col min-h-screen bg-[#F8F8F5] dark:bg-[#141B20] p-6 max-w-md mx-auto w-full select-none">
-        <div className="flex items-center gap-3 pt-2 mb-8">
-          <button
-            onClick={() => setAuthStep('splash')}
-            className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-[#68747A]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-bold text-[#8C9BA5]">Step 1 of 3</span>
-        </div>
-
         <div className="flex-1">
-          <h2 className="text-2xl font-extrabold text-[#202A30] dark:text-[#F4F5F2]">
-            What’s your phone number?
+          <div className="flex flex-col items-center mb-6">
+            <RoyalChatMark size={52} />
+          </div>
+          <h2 className="text-2xl font-extrabold text-[#202A30] dark:text-[#F4F5F2] text-center">
+            Create your account
           </h2>
-          <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] mt-2 mb-6">
-            Relay will send a verification SMS code. Carrier fees may apply.
+          <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] mt-2 mb-6 text-center">
+            Free forever. Just an email, a username, and a password.
           </p>
 
-          <form onSubmit={handlePhoneSubmit} className="space-y-4">
-            {/* Country code selector button */}
-            <div
-              onClick={() => setShowCountryPicker(true)}
-              className="flex items-center justify-between p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl cursor-pointer hover:border-[#F05D48]"
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="text-lg">{selectedCountry.flag}</span>
-                <span className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
-                  {selectedCountry.name} ({selectedCountry.code})
-                </span>
-              </div>
-              <ChevronDown className="w-4 h-4 text-[#8C9BA5]" />
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@gmail.com"
+                autoComplete="email"
+                className="w-full mt-1.5 p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-sm font-medium outline-none focus:border-[#F05D48] text-[#202A30] dark:text-[#F4F5F2]"
+                required
+              />
             </div>
 
-            {/* Phone input */}
-            <div className="flex items-center bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl px-4 py-3 focus-within:border-[#F05D48]">
-              <span className="font-mono text-sm font-semibold text-[#68747A] mr-2">
-                {selectedCountry.code}
-              </span>
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Username</label>
+              <div className="flex items-center mt-1.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl px-3.5 focus-within:border-[#F05D48]">
+                <span className="text-sm font-semibold text-[#8C9BA5] mr-1">@</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
+                  placeholder="yourusername"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  className="w-full py-3.5 bg-transparent text-sm font-medium outline-none text-[#202A30] dark:text-[#F4F5F2]"
+                  required
+                />
+              </div>
+              <p className="text-[11px] text-[#8C9BA5] mt-1">
+                People find and message you by this username — 3-20 characters, lowercase letters, numbers, underscore.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Full Name</label>
               <input
-                type="tel"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="Phone number"
-                className="w-full bg-transparent text-base font-semibold text-[#202A30] dark:text-[#F4F5F2] outline-none"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="What should people call you?"
+                autoComplete="name"
+                className="w-full mt-1.5 p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-sm font-medium outline-none focus:border-[#F05D48] text-[#202A30] dark:text-[#F4F5F2]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Password</label>
+              <div className="flex items-center mt-1.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl pr-3 focus-within:border-[#F05D48]">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                  className="w-full p-3.5 bg-transparent text-sm font-medium outline-none text-[#202A30] dark:text-[#F4F5F2]"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="text-[#8C9BA5]"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {combinedError && (
+              <p className="text-xs font-medium text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                {combinedError}
+              </p>
+            )}
+
+            <div className="pt-2">
+              <RoyalChatButton type="submit" disabled={authLoading}>
+                {authLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Creating account...
+                  </span>
+                ) : (
+                  'Create account'
+                )}
+              </RoyalChatButton>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAuthStep('login')}
+              className="w-full text-center text-xs font-semibold text-[#68747A] dark:text-[#ACB7BD] hover:text-[#F05D48] pt-1"
+            >
+              Already have an account? Log in
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Log In Screen — email + password only.
+  if (authStep === 'login') {
+    return (
+      <div className="flex flex-col min-h-screen bg-[#F8F8F5] dark:bg-[#141B20] p-6 max-w-md mx-auto w-full select-none">
+        <div className="flex-1">
+          <div className="flex flex-col items-center mb-6">
+            <RoyalChatMark size={52} />
+          </div>
+          <h2 className="text-2xl font-extrabold text-[#202A30] dark:text-[#F4F5F2] text-center">
+            Welcome back
+          </h2>
+          <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] mt-2 mb-6 text-center">
+            Log in with your email and password.
+          </p>
+
+          <form onSubmit={handleLogIn} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@gmail.com"
+                autoComplete="email"
+                className="w-full mt-1.5 p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-sm font-medium outline-none focus:border-[#F05D48] text-[#202A30] dark:text-[#F4F5F2]"
+                required
                 autoFocus
               />
             </div>
 
-            <div className="pt-6">
-              <RelayButton type="submit">Continue</RelayButton>
-            </div>
-          </form>
-        </div>
-
-        {/* Country Picker Modal */}
-        {showCountryPicker && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-            <div className="bg-white dark:bg-[#202A30] w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-[#E2E7EC] dark:border-[#354148]">
-              <h3 className="font-bold text-base text-[#202A30] dark:text-[#F4F5F2] mb-3">
-                Select Country
-              </h3>
-              <input
-                type="text"
-                value={countrySearch}
-                onChange={(e) => setCountrySearch(e.target.value)}
-                placeholder="Search countries..."
-                className="w-full p-2.5 bg-stone-50 dark:bg-[#182026] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-xs mb-3 outline-none"
-              />
-              <div className="max-h-64 overflow-y-auto divide-y divide-[#E2E7EC] dark:divide-[#354148]">
-                {COUNTRIES.filter((c) =>
-                  c.name.toLowerCase().includes(countrySearch.toLowerCase())
-                ).map((c) => (
-                  <div
-                    key={c.name}
-                    onClick={() => {
-                      setSelectedCountry(c);
-                      setShowCountryPicker(false);
-                    }}
-                    className="flex items-center justify-between py-3 px-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span>{c.flag}</span>
-                      <span className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
-                        {c.name}
-                      </span>
-                    </div>
-                    <span className="text-xs font-mono text-[#8C9BA5]">
-                      {c.code}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // 3. OTP Verification Screen
-  if (authStep === 'otp') {
-    return (
-      <div className="flex flex-col min-h-screen bg-[#F8F8F5] dark:bg-[#141B20] p-6 max-w-md mx-auto w-full select-none">
-        <div className="flex items-center gap-3 pt-2 mb-8">
-          <button
-            onClick={() => setAuthStep('phone')}
-            className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-[#68747A]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-bold text-[#8C9BA5]">Step 2 of 3</span>
-        </div>
-
-        <div className="flex-1">
-          <h2 className="text-2xl font-extrabold text-[#202A30] dark:text-[#F4F5F2]">
-            Enter 6-digit code
-          </h2>
-          <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] mt-2 mb-6">
-            Enter the code sent to {selectedCountry.code} {phoneInput}.
-          </p>
-
-          <form onSubmit={handleOtpSubmit} className="space-y-6">
-            <div className="flex justify-between gap-2">
-              {otpCode.map((digit, idx) => (
+            <div>
+              <label className="text-xs font-semibold text-[#8C9BA5]">Password</label>
+              <div className="flex items-center mt-1.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl pr-3 focus-within:border-[#F05D48]">
                 <input
-                  key={idx}
-                  id={`otp-input-${idx}`}
-                  type="text"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(idx, e.target.value)}
-                  className="w-12 h-14 text-center font-mono text-xl font-bold bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl focus:border-[#F05D48] outline-none text-[#202A30] dark:text-[#F4F5F2]"
-                />
-              ))}
-            </div>
-
-            <div className="text-center text-xs text-[#68747A] dark:text-[#ACB7BD]">
-              {resendCountdown > 0 ? (
-                <span>Resend code in {resendCountdown}s</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setResendCountdown(30)}
-                  className="text-[#F05D48] font-bold hover:underline"
-                >
-                  Resend code
-                </button>
-              )}
-            </div>
-
-            <div className="pt-4">
-              <RelayButton type="submit">Verify & Proceed</RelayButton>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // 4. Profile Setup Screen
-  if (authStep === 'profile') {
-    return (
-      <div className="flex flex-col min-h-screen bg-[#F8F8F5] dark:bg-[#141B20] p-6 max-w-md mx-auto w-full select-none">
-        <div className="pt-2 mb-8">
-          <span className="text-sm font-bold text-[#8C9BA5]">Step 3 of 3</span>
-        </div>
-
-        <div className="flex-1">
-          <h2 className="text-2xl font-extrabold text-[#202A30] dark:text-[#F4F5F2]">
-            Set up your profile
-          </h2>
-          <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] mt-2 mb-6">
-            This name and about status will be visible to your Relay contacts.
-          </p>
-
-          <form onSubmit={handleProfileSubmit} className="space-y-6">
-            {/* Avatar picker simulation */}
-            <div className="flex flex-col items-center">
-              <div className="relative group cursor-pointer">
-                <RelayAvatar name={profileName || 'User'} size={88} />
-                <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6" />
-                </div>
-              </div>
-              <span className="text-xs font-semibold text-[#F05D48] mt-2">
-                Change photo
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-[#8C9BA5]">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full mt-1.5 p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-sm font-semibold outline-none focus:border-[#F05D48] text-[#202A30] dark:text-[#F4F5F2]"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                  className="w-full p-3.5 bg-transparent text-sm font-medium outline-none text-[#202A30] dark:text-[#F4F5F2]"
                   required
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#8C9BA5]">
-                  About Status
-                </label>
-                <input
-                  type="text"
-                  value={profileAbout}
-                  onChange={(e) => setProfileAbout(e.target.value)}
-                  placeholder="What’s on your mind?"
-                  className="w-full mt-1.5 p-3.5 bg-white dark:bg-[#202A30] border border-[#E2E7EC] dark:border-[#354148] rounded-xl text-sm outline-none focus:border-[#F05D48] text-[#202A30] dark:text-[#F4F5F2]"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="text-[#8C9BA5]"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
-            <div className="pt-6">
-              <RelayButton type="submit">Complete Registration</RelayButton>
+            {combinedError && (
+              <p className="text-xs font-medium text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                {combinedError}
+              </p>
+            )}
+
+            <div className="pt-2">
+              <RoyalChatButton type="submit" disabled={authLoading}>
+                {authLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Logging in...
+                  </span>
+                ) : (
+                  'Log in'
+                )}
+              </RoyalChatButton>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setAuthStep('signup')}
+              className="w-full text-center text-xs font-semibold text-[#68747A] dark:text-[#ACB7BD] hover:text-[#F05D48] pt-1"
+            >
+              Don't have an account? Create one
+            </button>
           </form>
         </div>
       </div>

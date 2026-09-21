@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { Conversation, InboxFilter } from '../../types';
-import { RelayAvatar } from '../common/RelayAvatar';
-import { RelayMark } from '../common/RelayMark';
-import { RelayReceipt } from '../common/RelayReceipt';
-import { NewRelayModal } from './NewRelayModal';
+import { RoyalChatAvatar } from '../common/RoyalChatAvatar';
+import { RoyalChatMark } from '../common/RoyalChatMark';
+import { RoyalChatReceipt } from '../common/RoyalChatReceipt';
+import { NewChatModal } from './NewChatModal';
 import {
   Search,
   X,
   Pin,
+  PinOff,
   VolumeX,
+  Volume2,
   Mic,
   Image as ImageIcon,
   SquarePen,
   Settings as SettingsIcon,
+  MoreVertical,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -37,7 +40,8 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
     markConversationRead,
   } = useApp();
 
-  const [showNewRelay, setShowNewRelay] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Compute unread and group counts
   const totalUnreadCount = conversations.reduce(
@@ -62,11 +66,13 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
     return true;
   });
 
-  // Sort pinned items to the top
+  // Sort by pinned first, then by most recent activity (a chat list that
+  // doesn't reorder on new messages is a real usability bug, not a
+  // stylistic choice).
   const sortedList = [...filteredList].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
-    return 0;
+    return (b.lastMessageAt || 0) - (a.lastMessageAt || 0);
   });
 
   const handleSelectChat = (conversation: Conversation) => {
@@ -80,17 +86,17 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
       <div className="p-4 pb-2 bg-white dark:bg-[#202A30] border-b border-[#E2E7EC] dark:border-[#354148] z-10 shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <RelayMark size={32} />
+            <RoyalChatMark size={32} />
             <h1 className="text-xl font-extrabold tracking-tight text-[#202A30] dark:text-[#F4F5F2]">
-              Relay
+              Royal Chat
             </h1>
           </div>
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowNewRelay(true)}
+              onClick={() => setShowNewChat(true)}
               className="p-2 text-[#68747A] dark:text-[#ACB7BD] hover:text-[#202A30] dark:hover:text-white rounded-full hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-              title="New Relay"
+              title="New Royal Chat"
             >
               <SquarePen className="w-5 h-5" />
             </button>
@@ -175,7 +181,7 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
               No conversations found
             </p>
             <button
-              onClick={() => setShowNewRelay(true)}
+              onClick={() => setShowNewChat(true)}
               className="mt-3 text-xs font-semibold text-[#F05D48] hover:underline"
             >
               Start a new chat
@@ -184,18 +190,19 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
         ) : (
           sortedList.map((convo) => {
             const isSelected = convo.id === activeConversationId;
+            const isMenuOpen = openMenuId === convo.id;
             return (
               <div
                 key={convo.id}
                 onClick={() => handleSelectChat(convo)}
-                className={`flex items-center gap-3.5 p-3.5 cursor-pointer transition-colors select-none ${
+                className={`group relative flex items-center gap-3.5 p-3.5 cursor-pointer transition-colors select-none ${
                   isSelected
                     ? 'bg-stone-200/80 dark:bg-[#25323A]'
                     : 'hover:bg-stone-100/70 dark:hover:bg-[#182026]'
                 }`}
               >
                 {/* Avatar with live online green badge */}
-                <RelayAvatar
+                <RoyalChatAvatar
                   name={convo.name}
                   asset={convo.avatarAsset}
                   size={48}
@@ -227,7 +234,7 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs text-[#68747A] dark:text-[#ACB7BD] truncate">
                       {convo.delivery && (
-                        <RelayReceipt stage={convo.delivery} size={14} />
+                        <RoyalChatReceipt stage={convo.delivery} size={14} />
                       )}
                       {convo.previewKind === 'voice' && (
                         <Mic className="w-3.5 h-3.5 text-[#F05D48] shrink-0" />
@@ -250,6 +257,67 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Row menu (pin / mute) */}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(isMenuOpen ? null : convo.id);
+                    }}
+                    className={`p-1.5 rounded-full text-[#8C9BA5] hover:bg-black/10 dark:hover:bg-white/10 hover:text-[#202A30] dark:hover:text-white transition-opacity ${
+                      isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                    aria-label="Chat options"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {isMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                        }}
+                      />
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#202A30] rounded-xl shadow-xl border border-[#E2E7EC] dark:border-[#354148] py-1 z-40"
+                      >
+                        <button
+                          onClick={() => {
+                            togglePinConversation(convo.id);
+                            setOpenMenuId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#202A30] dark:text-[#F4F5F2] hover:bg-black/5 dark:hover:bg-white/5 text-left"
+                        >
+                          {convo.pinned ? (
+                            <PinOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <Pin className="w-3.5 h-3.5" />
+                          )}
+                          <span>{convo.pinned ? 'Unpin chat' : 'Pin chat'}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            toggleMuteConversation(convo.id);
+                            setOpenMenuId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#202A30] dark:text-[#F4F5F2] hover:bg-black/5 dark:hover:bg-white/5 text-left"
+                        >
+                          {convo.muted ? (
+                            <Volume2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <VolumeX className="w-3.5 h-3.5" />
+                          )}
+                          <span>{convo.muted ? 'Unmute' : 'Mute notifications'}</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })
@@ -258,16 +326,16 @@ export const ChatListPage: React.FC<ChatListPageProps> = ({
 
       {/* Floating Action Button (for mobile quick compose) */}
       <button
-        onClick={() => setShowNewRelay(true)}
+        onClick={() => setShowNewChat(true)}
         className="md:hidden absolute bottom-5 right-5 w-13 h-13 rounded-full bg-[#F05D48] hover:bg-[#C83E2B] text-white flex items-center justify-center shadow-xl shadow-[#F05D48]/30 transition-transform active:scale-95 cursor-pointer z-30"
         title="New Chat"
       >
         <SquarePen className="w-6 h-6" />
       </button>
 
-      {/* New Relay Compose Modal */}
-      {showNewRelay && (
-        <NewRelayModal onClose={() => setShowNewRelay(false)} />
+      {/* New Royal Chat Compose Modal */}
+      {showNewChat && (
+        <NewChatModal onClose={() => setShowNewChat(false)} />
       )}
     </div>
   );

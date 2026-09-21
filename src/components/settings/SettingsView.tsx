@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { RelayAvatar } from '../common/RelayAvatar';
-import { RelayButton } from '../common/RelayButton';
+import { RoyalChatAvatar } from '../common/RoyalChatAvatar';
+import { RoyalChatButton } from '../common/RoyalChatButton';
 import {
   ArrowLeft,
-  Shield,
+  ShieldCheck,
+  ChevronRight,
   Bell,
   HardDrive,
   Database,
@@ -11,14 +12,10 @@ import {
   Sun,
   Smartphone,
   Trash2,
-  ChevronRight,
   Download,
-  Key,
-  Lock,
   Edit2,
-  Check,
   X,
-  FileText,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -35,11 +32,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
     clearCache,
     exportBackup,
     deleteAccount,
+    logOut,
     showToast,
   } = useApp();
 
   const [activeSubModal, setActiveSubModal] = useState<
-    'profile' | 'security' | 'storage' | 'backup' | 'delete' | null
+    'profile' | 'encryption' | 'storage' | 'backup' | 'delete' | null
   >(null);
 
   // Profile edit states
@@ -91,7 +89,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
           }}
           className="flex items-center gap-4 p-4 bg-white dark:bg-[#202A30] rounded-2xl border border-[#E2E7EC] dark:border-[#354148] cursor-pointer hover:bg-stone-50 dark:hover:bg-[#25323A] transition-colors shadow-2xs"
         >
-          <RelayAvatar
+          <RoyalChatAvatar
             name={currentUser.displayName}
             asset={currentUser.avatarUrl}
             size={58}
@@ -105,7 +103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
               {currentUser.about}
             </p>
             <p className="text-[11px] font-mono text-[#8C9BA5] mt-0.5">
-              {currentUser.phoneNumber}
+              @{currentUser.username} · {currentUser.email}
             </p>
           </div>
           <Edit2 className="w-4 h-4 text-[#8C9BA5]" />
@@ -160,17 +158,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
           </div>
 
           <div
-            onClick={() => setActiveSubModal('security')}
+            onClick={() => setActiveSubModal('encryption')}
             className="flex items-center justify-between p-4 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
           >
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-[#10B981]" />
+              <ShieldCheck className="w-5 h-5 text-[#10B981]" />
               <div>
                 <div className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
-                  End-to-End Encryption
+                  Encryption
                 </div>
                 <div className="text-xs text-[#68747A] dark:text-[#ACB7BD]">
-                  X25519 ECDH + AES-GCM-256 active
+                  ECDH (P-256) + AES-256-GCM, key kept on this device
                 </div>
               </div>
             </div>
@@ -290,7 +288,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
               <Database className="w-5 h-5 text-indigo-500" />
               <div>
                 <div className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
-                  Encrypted Chat Backup
+                  Chat Backup
                 </div>
                 <div className="text-xs text-[#68747A] dark:text-[#ACB7BD]">
                   Last backup: {settings.lastBackupTime || 'Never'}
@@ -304,9 +302,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
         {/* App Info & Danger Zone */}
         <div className="bg-white dark:bg-[#202A30] rounded-2xl border border-[#E2E7EC] dark:border-[#354148] divide-y divide-[#E2E7EC] dark:divide-[#354148]">
           <div className="p-4 flex items-center justify-between text-xs text-[#8C9BA5]">
-            <span>Relay Application</span>
-            <span>v0.3.0 · Zero Infra Mode</span>
+            <span>Royal Chat Application</span>
+            <span>v1.0.0</span>
           </div>
+
+          <button
+            onClick={() => logOut()}
+            className="w-full flex items-center gap-3 p-4 text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2] hover:bg-black/5 dark:hover:bg-white/5 text-left transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Log out</span>
+          </button>
 
           <button
             onClick={() => setActiveSubModal('delete')}
@@ -360,22 +366,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
               </div>
 
               <div className="pt-2">
-                <RelayButton onClick={handleSaveProfile}>Save Changes</RelayButton>
+                <RoyalChatButton onClick={handleSaveProfile}>Save Changes</RoyalChatButton>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Security & Key Vault Sub-Modal */}
-      {activeSubModal === 'security' && (
+      {/* Encryption Sub-Modal */}
+      {activeSubModal === 'encryption' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#202A30] w-full max-w-md rounded-3xl p-6 shadow-2xl border border-[#E2E7EC] dark:border-[#354148]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-[#10B981]" />
+                <ShieldCheck className="w-5 h-5 text-[#10B981]" />
                 <h3 className="font-bold text-base text-[#202A30] dark:text-[#F4F5F2]">
-                  Key Vault & E2EE
+                  Encryption
                 </h3>
               </div>
               <button
@@ -387,27 +393,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
             </div>
 
             <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] leading-relaxed mb-4">
-              Relay uses the X25519 Elliptic Curve Diffie-Hellman protocol combined with AES-256-GCM authenticated encryption. Your private keys never leave your device.
+              Your messages, photos, and voice notes are encrypted on your device before they're sent — Royal Chat's own servers never see the plaintext content. Each account has its own ECDH (P-256) key pair; the private key is generated and stored only on this device and is never uploaded anywhere.
             </p>
 
             <div className="p-3 bg-stone-50 dark:bg-[#182026] rounded-xl border border-[#E2E7EC] dark:border-[#354148] mb-4">
               <div className="text-[11px] font-semibold text-[#8C9BA5] uppercase mb-1">
-                Your Public Identity Key
+                Your Encryption Fingerprint
               </div>
               <div className="font-mono text-xs text-[#202A30] dark:text-[#F4F5F2] break-all">
-                {currentUser.publicKey}
+                {currentUser.publicKey || 'Setting up...'}
               </div>
             </div>
 
-            <RelayButton
+            <p className="text-[11px] text-[#8C9BA5] leading-relaxed mb-4">
+              Note: the private key lives only on this device. Logging in on a new device generates a new key, and older message content won't be readable there — there is no cross-device key backup in this version. This has not been through independent security review.
+            </p>
+
+            <RoyalChatButton
               variant="secondary"
               onClick={() => {
                 navigator.clipboard.writeText(currentUser.publicKey);
-                showToast('Key copied to clipboard', 'copy');
+                showToast('Fingerprint copied to clipboard', 'copy');
               }}
             >
-              Copy Public Key
-            </RelayButton>
+              Copy Fingerprint
+            </RoyalChatButton>
           </div>
         </div>
       )}
@@ -442,14 +452,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
                 </span>
               </div>
               <div className="flex justify-between p-2 rounded bg-stone-50 dark:bg-[#182026]">
-                <span>Encrypted Index Database</span>
+                <span>Local App Data</span>
                 <span className="font-mono font-bold text-[#202A30] dark:text-[#F4F5F2]">
                   {settings.cacheMb.files} MB
                 </span>
               </div>
             </div>
 
-            <RelayButton
+            <RoyalChatButton
               variant="danger"
               onClick={() => {
                 clearCache();
@@ -457,7 +467,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
               }}
             >
               Clear Cached Media
-            </RelayButton>
+            </RoyalChatButton>
           </div>
         </div>
       )}
@@ -479,28 +489,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
             </div>
 
             <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] leading-relaxed mb-4">
-              Generate an encrypted, password-protected archive of all your chats, contacts, and media to download locally.
+              Download a JSON file of your chats and messages to keep on your own device. This file is not encrypted or password-protected — store it somewhere private.
             </p>
 
             <div className="space-y-2">
-              <RelayButton
+              <RoyalChatButton
                 onClick={() => {
                   exportBackup();
                   setActiveSubModal(null);
                 }}
                 icon={<Download className="w-4 h-4" />}
               >
-                Export Encrypted Backup
-              </RelayButton>
-              <RelayButton
-                variant="secondary"
-                onClick={() => {
-                  showToast('Backup restored from local device', 'check');
-                  setActiveSubModal(null);
-                }}
-              >
-                Restore From File
-              </RelayButton>
+                Export Backup
+              </RoyalChatButton>
             </div>
           </div>
         </div>
@@ -517,24 +518,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
               Delete Account?
             </h3>
             <p className="text-xs text-[#68747A] dark:text-[#ACB7BD] my-2">
-              This will erase your cryptographic identity, keys, and chat history permanently.
+              This will permanently delete your account, username, and all chat history.
             </p>
             <div className="flex gap-2 mt-4">
-              <RelayButton
+              <RoyalChatButton
                 variant="secondary"
                 onClick={() => setActiveSubModal(null)}
               >
                 Cancel
-              </RelayButton>
-              <RelayButton
+              </RoyalChatButton>
+              <RoyalChatButton
                 variant="danger"
                 onClick={() => {
-                  deleteAccount();
+                  deleteAccount().catch(() => {});
                   setActiveSubModal(null);
                 }}
               >
                 Erase Everything
-              </RelayButton>
+              </RoyalChatButton>
             </div>
           </div>
         </div>

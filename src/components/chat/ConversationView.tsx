@@ -1,19 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Conversation, MessageReply } from '../../types';
-import { RelayAvatar } from '../common/RelayAvatar';
+import { RoyalChatAvatar } from '../common/RoyalChatAvatar';
 import { MessageBubble } from './MessageBubble';
 import { MessageComposer } from './MessageComposer';
-import { SafetyNumberModal } from './SafetyNumberModal';
 import { ContactProfileModal } from './ContactProfileModal';
 import { GroupDetailsModal } from './GroupDetailsModal';
 import { MediaPreviewModal } from './MediaPreviewModal';
 import {
   ArrowLeft,
-  Lock,
   Phone,
   Video,
   MoreVertical,
-  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -26,11 +23,10 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   conversation,
   onBack,
 }) => {
-  const { messages, typingContacts, markConversationRead, sendImageMessage, showToast } =
+  const { messages, typingContacts, markConversationRead, sendImageMessage, startCall, showToast } =
     useApp();
 
   const [replyTarget, setReplyTarget] = useState<MessageReply | null>(null);
-  const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
@@ -49,8 +45,20 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
     markConversationRead(conversation.id);
   }, [conversation.id, markConversationRead]);
 
-  const handleCall = () => {
-    showToast(`Calling ${conversation.name}... (Encrypted connection)`, 'info');
+  const handleAudioCall = () => {
+    if (conversation.isGroup) {
+      showToast('Group calling is not supported yet — only one-to-one calls.', 'info');
+      return;
+    }
+    startCall(conversation.id, 'audio');
+  };
+
+  const handleVideoCall = () => {
+    if (conversation.isGroup) {
+      showToast('Group calling is not supported yet — only one-to-one calls.', 'info');
+      return;
+    }
+    startCall(conversation.id, 'video');
   };
 
   const handleSendPhotoPreview = (imageUrl: string) => {
@@ -89,7 +97,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             onClick={() => setShowDetailsModal(true)}
             className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 min-w-0"
           >
-            <RelayAvatar
+            <RoyalChatAvatar
               name={conversation.name}
               asset={conversation.avatarAsset}
               size={40}
@@ -106,7 +114,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                   </span>
                 ) : conversation.isGroup ? (
                   <span>
-                    {conversation.members?.length || 4} members
+                    {conversation.members?.length ?? 0} members
                   </span>
                 ) : conversation.online ? (
                   <span className="text-[#10B981] font-medium">Online</span>
@@ -120,17 +128,8 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Safety Lock Button */}
           <button
-            onClick={() => setShowSafetyModal(true)}
-            className="p-2 text-[#68747A] dark:text-[#ACB7BD] hover:text-[#10B981] dark:hover:text-[#10B981] rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            title="End-to-End Encryption verified"
-          >
-            <ShieldCheck className="w-4 h-4 text-[#10B981]" />
-          </button>
-
-          <button
-            onClick={handleCall}
+            onClick={handleAudioCall}
             className="p-2 text-[#68747A] dark:text-[#ACB7BD] hover:text-[#202A30] dark:hover:text-white rounded-full hover:bg-black/5 dark:hover:bg-white/5"
             title="Audio call"
           >
@@ -138,7 +137,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
           </button>
 
           <button
-            onClick={handleCall}
+            onClick={handleVideoCall}
             className="p-2 text-[#68747A] dark:text-[#ACB7BD] hover:text-[#202A30] dark:hover:text-white rounded-full hover:bg-black/5 dark:hover:bg-white/5"
             title="Video call"
           >
@@ -157,17 +156,6 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
 
       {/* Messages Thread Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 select-text">
-        {/* Security Notice Banner */}
-        <div className="flex justify-center my-3">
-          <div
-            onClick={() => setShowSafetyModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200/90 text-[11px] rounded-xl border border-amber-200/60 dark:border-amber-800/50 max-w-sm text-center shadow-2xs cursor-pointer hover:bg-amber-100/70"
-          >
-            <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Messages are end-to-end encrypted. Tap to verify.</span>
-          </div>
-        </div>
-
         {/* Date pill */}
         <div className="flex justify-center my-2">
           <span className="px-2.5 py-0.5 bg-black/5 dark:bg-white/10 text-[10.5px] font-semibold text-[#68747A] dark:text-[#ACB7BD] rounded-full">
@@ -197,13 +185,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
               showSenderName={conversation.isGroup}
               senderName={
                 conversation.isGroup && !msg.isMine
-                  ? msg.senderId === 'sami'
-                    ? 'Sami Ahmed'
-                    : msg.senderId === 'mom'
-                    ? 'Mom'
-                    : msg.senderId === 'rafi'
-                    ? 'Rafi'
-                    : conversation.name
+                  ? msg.senderName || 'Member'
                   : undefined
               }
             />
@@ -229,22 +211,20 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       </div>
 
       {/* Message Composer Footer */}
-      <MessageComposer
-        conversationId={conversation.id}
-        replyTarget={replyTarget}
-        onClearReply={() => setReplyTarget(null)}
-        onOpenImagePreview={handleSendPhotoPreview}
-      />
-
-      {/* Modals */}
-      {showSafetyModal && (
-        <SafetyNumberModal
-          contactName={conversation.name}
-          avatarAsset={conversation.avatarAsset}
-          onClose={() => setShowSafetyModal(false)}
+      {conversation.blocked ? (
+        <div className="border-t border-[#E2E7EC] dark:border-[#354148] bg-[#F8F8F5] dark:bg-[#141B20] px-4 py-3 text-center text-xs text-[#8C9BA5]">
+          You blocked {conversation.name}. Unblock from their contact info to send messages.
+        </div>
+      ) : (
+        <MessageComposer
+          conversationId={conversation.id}
+          replyTarget={replyTarget}
+          onClearReply={() => setReplyTarget(null)}
+          onOpenImagePreview={handleSendPhotoPreview}
         />
       )}
 
+      {/* Modals */}
       {showDetailsModal &&
         (conversation.isGroup ? (
           <GroupDetailsModal

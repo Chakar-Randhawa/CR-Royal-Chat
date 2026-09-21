@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Conversation } from '../../types';
-import { RelayAvatar } from '../common/RelayAvatar';
-import { SafetyNumberModal } from './SafetyNumberModal';
+import { RoyalChatAvatar } from '../common/RoyalChatAvatar';
 import {
   X,
   Phone,
   Video,
-  ShieldCheck,
   Bell,
   BellOff,
-  Clock,
   Trash2,
   Ban,
-  ChevronRight,
   Image as ImageIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -26,17 +22,34 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
   conversation,
   onClose,
 }) => {
-  const { toggleMuteConversation, showToast } = useApp();
-  const [showSafetyNumber, setShowSafetyNumber] = useState(false);
+  const { toggleMuteConversation, toggleBlockConversation, clearChatHistory, startCall, messages, showToast } = useApp();
 
   const isMuted = conversation.muted;
+  const isBlocked = conversation.blocked;
+  const photoCount = (messages[conversation.id] || []).filter(
+    (m) => m.kind === 'image' && !m.isDeleted
+  ).length;
 
-  const handleCall = () => {
-    showToast(`Calling ${conversation.name}... (Simulated call)`, 'info');
+  const handleAudioCall = () => {
+    if (conversation.isGroup) {
+      showToast('Group calling is not supported yet — only one-to-one calls.', 'info');
+      return;
+    }
+    startCall(conversation.id, 'audio');
+    onClose();
+  };
+
+  const handleVideoCall = () => {
+    if (conversation.isGroup) {
+      showToast('Group calling is not supported yet — only one-to-one calls.', 'info');
+      return;
+    }
+    startCall(conversation.id, 'video');
+    onClose();
   };
 
   const handleClearChat = () => {
-    showToast('Chat cleared', 'check');
+    clearChatHistory(conversation.id);
     onClose();
   };
 
@@ -60,7 +73,7 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Avatar and Info Header */}
           <div className="flex flex-col items-center text-center">
-            <RelayAvatar
+            <RoyalChatAvatar
               name={conversation.name}
               asset={conversation.avatarAsset}
               size={84}
@@ -76,14 +89,14 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
             {/* Quick Call Action buttons */}
             <div className="flex items-center gap-3 mt-4">
               <button
-                onClick={handleCall}
+                onClick={handleAudioCall}
                 className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#202A30] hover:bg-[#E2E7EC] dark:hover:bg-[#2B3740] rounded-xl border border-[#E2E7EC] dark:border-[#354148] text-xs font-semibold text-[#202A30] dark:text-[#F4F5F2]"
               >
                 <Phone className="w-4 h-4 text-[#F05D48]" />
                 <span>Audio</span>
               </button>
               <button
-                onClick={handleCall}
+                onClick={handleVideoCall}
                 className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#202A30] hover:bg-[#E2E7EC] dark:hover:bg-[#2B3740] rounded-xl border border-[#E2E7EC] dark:border-[#354148] text-xs font-semibold text-[#202A30] dark:text-[#F4F5F2]"
               >
                 <Video className="w-4 h-4 text-[#F05D48]" />
@@ -98,29 +111,8 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
               About
             </div>
             <p className="text-sm text-[#202A30] dark:text-[#F4F5F2]">
-              {conversation.description || 'Available on Relay'}
+              {conversation.description || 'Available on Royal Chat'}
             </p>
-          </div>
-
-          {/* Security & Verification Tile */}
-          <div
-            onClick={() => setShowSafetyNumber(true)}
-            className="flex items-center justify-between p-4 bg-white dark:bg-[#202A30] rounded-2xl border border-[#E2E7EC] dark:border-[#354148] cursor-pointer hover:bg-stone-50 dark:hover:bg-[#25323A] transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#10B981]/15 text-[#10B981] rounded-xl">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
-                  Encryption & Safety Number
-                </div>
-                <div className="text-xs text-[#68747A] dark:text-[#ACB7BD]">
-                  X25519 ECDH + AES-GCM-256
-                </div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-[#8C9BA5]" />
           </div>
 
           {/* Settings / Options */}
@@ -142,20 +134,14 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
-              <div className="flex items-center gap-3 text-sm text-[#202A30] dark:text-[#F4F5F2]">
-                <Clock className="w-4 h-4 text-[#68747A]" />
-                <span>Disappearing messages</span>
-              </div>
-              <span className="text-xs text-[#8C9BA5] font-medium">Off</span>
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+            <div className="flex items-center justify-between p-3.5">
               <div className="flex items-center gap-3 text-sm text-[#202A30] dark:text-[#F4F5F2]">
                 <ImageIcon className="w-4 h-4 text-[#68747A]" />
                 <span>Media, links, and docs</span>
               </div>
-              <span className="text-xs text-[#8C9BA5] font-medium">1 photo</span>
+              <span className="text-xs text-[#8C9BA5] font-medium">
+                {photoCount} {photoCount === 1 ? 'photo' : 'photos'}
+              </span>
             </div>
           </div>
 
@@ -169,26 +155,15 @@ export const ContactProfileModal: React.FC<ContactProfileModalProps> = ({
               <span>Clear chat history</span>
             </button>
             <button
-              onClick={() => {
-                showToast(`Blocked ${conversation.name}`, 'info');
-                onClose();
-              }}
+              onClick={() => toggleBlockConversation(conversation.id)}
               className="w-full flex items-center gap-3 p-3.5 text-sm text-red-500 hover:bg-red-500/10 text-left font-medium"
             >
               <Ban className="w-4 h-4" />
-              <span>Block {conversation.name}</span>
+              <span>{isBlocked ? `Unblock ${conversation.name}` : `Block ${conversation.name}`}</span>
             </button>
           </div>
         </div>
       </div>
-
-      {showSafetyNumber && (
-        <SafetyNumberModal
-          contactName={conversation.name}
-          avatarAsset={conversation.avatarAsset}
-          onClose={() => setShowSafetyNumber(false)}
-        />
-      )}
     </div>
   );
 };

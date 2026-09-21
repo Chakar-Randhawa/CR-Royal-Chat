@@ -9,7 +9,7 @@ import {
   Trash2,
   Lock,
   Image as ImageIcon,
-  FileText,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -33,7 +33,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onClearReply,
   onOpenImagePreview,
 }) => {
-  const { sendTextMessage, sendVoiceMessage, settings } = useApp();
+  const { sendTextMessage, sendVoiceMessage, settings, setTypingStatus, showToast } = useApp();
+  const typingStopTimerRef = useRef<number | null>(null);
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -42,10 +43,38 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingLocked, setRecordingLocked] = useState(false);
+  const [isPreparingMic, setIsPreparingMic] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
+  const recordingSecondsRef = useRef(0);
+  useEffect(() => {
+    recordingSecondsRef.current = recordingSeconds;
+  }, [recordingSeconds]);
+
+  // Real microphone recording (MediaRecorder) — no simulated/fake audio.
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const discardRecordingRef = useRef(false);
+
+  const MAX_RECORDING_SECONDS = 120; // keeps the resulting file well under Firestore's 1MB doc limit
+
+  const pickAudioMimeType = (): string | undefined => {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+    ];
+    return candidates.find((type) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type));
+  };
+
+  const stopMicStream = () => {
+    audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+    audioStreamRef.current = null;
+  };
 
   // Recording timer
   useEffect(() => {
@@ -62,12 +91,34 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     };
   }, [isRecording]);
 
+  // Auto-stop long recordings so the resulting file stays well under
+  // Firestore's 1MB document limit.
+  useEffect(() => {
+    if (isRecording && recordingSeconds >= MAX_RECORDING_SECONDS) {
+      handleFinishRecording();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRecording, recordingSeconds]);
+
+  // Release the microphone if the composer unmounts mid-recording.
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        discardRecordingRef.current = true;
+        mediaRecorderRef.current.stop();
+      }
+      stopMicStream();
+    };
+  }, []);
+
   const handleSendText = () => {
     if (!text.trim()) return;
     sendTextMessage(conversationId, text.trim(), replyTarget || undefined);
     setText('');
     onClearReply();
     setShowEmojiPicker(false);
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    setTypingStatus(conversationId, false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -86,7 +137,23 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
+
+    // Real typing indicator: flip on immediately, flip off after a
+    // short pause in typing (no more fake/simulated peer typing).
+    setTypingStatus(conversationId, true);
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    typingStopTimerRef.current = window.setTimeout(() => {
+      setTypingStatus(conversationId, false);
+    }, 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      setTypingStatus(conversationId, false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
 
   const handleEmojiSelect = (emoji: string) => {
     setText((prev) => prev + emoji);
@@ -95,20 +162,71 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   };
 
-  const handleStartRecording = () => {
-    setIsRecording(true);
-    setRecordingLocked(false);
+  const handleStartRecording = async () => {
+    if (isPreparingMic || isRecording) return;
+    setIsPreparingMic(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const mimeType = pickAudioMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      discardRecordingRef.current = false;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        stopMicStream();
+        const wasDiscarded = discardRecordingRef.current;
+        const chunks = audioChunksRef.current;
+        audioChunksRef.current = [];
+
+        if (wasDiscarded || chunks.length === 0) return;
+
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const finalSeconds = Math.max(1, recordingSecondsRef.current);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          sendVoiceMessage(conversationId, finalSeconds, dataUrl);
+        };
+        reader.onerror = () => {
+          showToast('Could not process the recording. Please try again.', 'info');
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingLocked(false);
+    } catch (err) {
+      showToast('Microphone access is required to send a voice message.', 'info');
+    } finally {
+      setIsPreparingMic(false);
+    }
   };
 
   const handleCancelRecording = () => {
+    discardRecordingRef.current = true;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    } else {
+      stopMicStream();
+    }
     setIsRecording(false);
     setRecordingLocked(false);
     setRecordingSeconds(0);
   };
 
   const handleFinishRecording = () => {
-    const finalSec = Math.max(1, recordingSeconds);
-    sendVoiceMessage(conversationId, finalSec);
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+    discardRecordingRef.current = false;
+    mediaRecorderRef.current.stop();
     setIsRecording(false);
     setRecordingLocked(false);
     setRecordingSeconds(0);
@@ -215,16 +333,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             <ImageIcon className="w-4 h-4 text-[#F05D48]" />
             <span>Photos & Videos</span>
           </button>
-          <button
-            onClick={() => {
-              onOpenImagePreview('/assets/images/sylhet_evening.png');
-              setShowAttachMenu(false);
-            }}
-            className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-[#202A30] dark:text-[#F4F5F2] hover:bg-black/5 dark:hover:bg-white/5 text-left"
-          >
-            <FileText className="w-4 h-4 text-sky-500" />
-            <span>Sample photo</span>
-          </button>
         </div>
       )}
 
@@ -326,11 +434,16 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           ) : (
             <button
               onClick={handleStartRecording}
-              className="w-10 h-10 rounded-full bg-stone-200 dark:bg-[#202A30] hover:bg-[#F05D48] hover:text-white text-[#68747A] dark:text-[#ACB7BD] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+              disabled={isPreparingMic}
+              className="w-10 h-10 rounded-full bg-stone-200 dark:bg-[#202A30] hover:bg-[#F05D48] hover:text-white text-[#68747A] dark:text-[#ACB7BD] flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
               aria-label="Record voice note"
-              title="Click or hold to record"
+              title="Click to record a voice message"
             >
-              <Mic className="w-5 h-5" />
+              {isPreparingMic ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
             </button>
           )}
         </div>

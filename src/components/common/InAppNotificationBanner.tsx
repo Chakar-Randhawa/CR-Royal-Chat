@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { RelayAvatar } from './RelayAvatar';
+import { RoyalChatAvatar } from './RoyalChatAvatar';
 import { X } from 'lucide-react';
 
 export const InAppNotificationBanner: React.FC = () => {
@@ -20,7 +20,7 @@ export const InAppNotificationBanner: React.FC = () => {
         onClick={handleClick}
         className="flex items-center gap-3 p-3 bg-white dark:bg-[#202A30] rounded-2xl shadow-xl border border-[#E2E7EC] dark:border-[#354148] cursor-pointer hover:shadow-2xl transition-all"
       >
-        <RelayAvatar
+        <RoyalChatAvatar
           name={inAppNotification.senderName}
           asset={inAppNotification.avatarUrl}
           size={42}

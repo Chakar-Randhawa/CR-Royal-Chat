@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { RelayMessage } from '../../types';
+import { Message } from '../../types';
 import { Reply, Copy, Star, Trash2, Info, X } from 'lucide-react';
 
 interface MessageContextMenuProps {
-  message: RelayMessage;
+  message: Message;
   onClose: () => void;
   onReact: (emoji: string) => void;
   onReply: () => void;
@@ -135,10 +135,6 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
             <div className="flex justify-between">
               <span>Delivery:</span>
               <span className="capitalize text-[#202A30] dark:text-[#F4F5F2]">{message.delivery || 'sent'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>E2EE Fingerprint:</span>
-              <span className="font-mono text-[#10B981]">SHA-256 · Verified</span>
             </div>
           </div>
         )}

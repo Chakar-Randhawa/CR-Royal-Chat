@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Conversation } from '../../types';
-import { RelayAvatar } from '../common/RelayAvatar';
-import { REGISTERED_CONTACTS } from '../../data/demoData';
+import { RoyalChatAvatar } from '../common/RoyalChatAvatar';
+import { UserSearchResult } from '../../lib/username';
 import {
   X,
   Edit2,
@@ -22,7 +22,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   conversation,
   onClose,
 }) => {
-  const { updateGroupInfo, showToast, setActiveConversationId } = useApp();
+  const { updateGroupInfo, showToast, setActiveConversationId, searchUsers, addGroupMembers, leaveGroup } = useApp();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(conversation.name);
@@ -31,9 +31,24 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   const [descVal, setDescVal] = useState(conversation.description || '');
 
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberResults, setMemberResults] = useState<UserSearchResult[]>([]);
 
-  const members = conversation.members || ['You', 'Aisha Rahman'];
-  const admins = conversation.groupAdmins || ['You'];
+  useEffect(() => {
+    const q = memberSearch.trim();
+    if (!q) {
+      setMemberResults([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      const found = await searchUsers(q);
+      setMemberResults(found);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [memberSearch, searchUsers]);
+
+  const members = conversation.members || [];
+  const admins = conversation.groupAdmins || [];
 
   const handleSaveName = () => {
     if (nameVal.trim() && nameVal !== conversation.name) {
@@ -50,18 +65,19 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   };
 
   const handleLeaveGroup = () => {
-    showToast('Left group', 'info');
+    leaveGroup(conversation.id);
     setActiveConversationId(null);
     onClose();
   };
 
-  const handleAddMember = (contactName: string) => {
-    if (members.includes(contactName)) {
-      showToast(`${contactName} is already in the group`, 'info');
+  const handleAddMember = (user: UserSearchResult) => {
+    if (members.includes(user.displayName)) {
+      showToast(`${user.displayName} is already in the group`, 'info');
       return;
     }
-    updateGroupInfo(conversation.id);
-    showToast(`Added ${contactName} to group`, 'check');
+    addGroupMembers(conversation.id, [
+      { uid: user.uid, displayName: user.displayName, username: user.username, avatarUrl: user.avatarUrl },
+    ]);
     setShowAddMembers(false);
   };
 
@@ -183,7 +199,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
                     className="flex items-center justify-between p-3"
                   >
                     <div className="flex items-center gap-3">
-                      <RelayAvatar name={memberName} size={38} />
+                      <RoyalChatAvatar name={memberName} size={38} />
                       <div>
                         <div className="text-sm font-semibold text-[#202A30] dark:text-[#F4F5F2]">
                           {memberName}
@@ -239,22 +255,43 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <div className="px-2 mb-2">
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Search by username..."
+                autoCapitalize="off"
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-[#182026] rounded-xl border border-[#E2E7EC] dark:border-[#354148] text-xs text-[#202A30] dark:text-[#F4F5F2] outline-none focus:border-[#F05D48]"
+              />
+            </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-[#E2E7EC] dark:divide-[#354148]">
-              {REGISTERED_CONTACTS.map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => handleAddMember(c.name)}
-                  className="flex items-center justify-between py-2.5 px-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <RelayAvatar name={c.name} asset={c.avatarAsset} size={36} />
-                    <span className="text-sm font-medium text-[#202A30] dark:text-[#F4F5F2]">
-                      {c.name}
-                    </span>
+              {memberSearch.trim() === '' ? (
+                <p className="text-xs text-[#8C9BA5] text-center py-4">
+                  Type a username to find people to add.
+                </p>
+              ) : memberResults.length === 0 ? (
+                <p className="text-xs text-[#8C9BA5] text-center py-4">No one found.</p>
+              ) : (
+                memberResults.map((c) => (
+                  <div
+                    key={c.uid}
+                    onClick={() => handleAddMember(c)}
+                    className="flex items-center justify-between py-2.5 px-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <RoyalChatAvatar name={c.displayName} asset={c.avatarUrl} size={36} />
+                      <div>
+                        <div className="text-sm font-medium text-[#202A30] dark:text-[#F4F5F2]">
+                          {c.displayName}
+                        </div>
+                        <div className="text-[11px] text-[#8C9BA5]">@{c.username}</div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-[#F05D48] font-semibold">Add</span>
                   </div>
-                  <span className="text-xs text-[#F05D48] font-semibold">Add</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -1,107 +1,130 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Play, Pause, Loader2 } from 'lucide-react';
 
 interface LiveWaveformProps {
+  asset?: string;
   durationSeconds?: number;
   isMine?: boolean;
 }
 
+// Decorative bar heights for the waveform track. Real per-message
+// frequency analysis of a static audio file adds real complexity
+// (decode + FFT) for a purely cosmetic effect — WhatsApp-style chat
+// apps use a fixed visual pattern too. The important part, actual
+// playback of the real recording below, is fully real.
+const WAVEFORM_HEIGHTS = [
+  20, 35, 60, 45, 80, 100, 75, 40, 65, 90, 55, 30, 45, 85, 95, 70, 50, 60, 40,
+  25, 30, 50, 70, 90, 85, 60, 45, 35, 20, 15,
+];
+
 export const LiveWaveform: React.FC<LiveWaveformProps> = ({
-  durationSeconds = 18,
+  asset,
+  durationSeconds = 0,
   isMine = false,
 }) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackProgress, setPlaybackProgress] = useState(0); // 0 to 1
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0); // 0..1
+  const [duration, setDuration] = useState(durationSeconds);
   const [speed, setSpeed] = useState<number>(1);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  // Deterministic heights for the voice waveform bars
-  const waveformHeights = [
-    20, 35, 60, 45, 80, 100, 75, 40, 65, 90,
-    55, 30, 45, 85, 95, 70, 50, 60, 40, 25,
-    30, 50, 70, 90, 85, 60, 45, 35, 20, 15
-  ];
 
   useEffect(() => {
-    let timer: number | null = null;
-    if (isPlaying) {
-      const stepMs = 100;
-      const totalSteps = (durationSeconds * 1000) / (stepMs * speed);
-      const increment = 1 / totalSteps;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-      timer = window.setInterval(() => {
-        setPlaybackProgress((prev) => {
-          if (prev >= 1) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return Math.min(1, prev + increment);
-        });
-      }, stepMs);
-    }
+    const onLoadedMetadata = () => {
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+      setIsLoading(false);
+    };
+    const onTimeUpdate = () => {
+      if (audio.duration) setProgress(audio.currentTime / audio.duration);
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+      setProgress(0);
+    };
+    const onWaiting = () => setIsLoading(true);
+    const onPlaying = () => setIsLoading(false);
+
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('playing', onPlaying);
 
     return () => {
-      if (timer) clearInterval(timer);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('playing', onPlaying);
     };
-  }, [isPlaying, durationSeconds, speed]);
+  }, [asset]);
 
   const togglePlay = () => {
-    if (!isPlaying && playbackProgress >= 1) {
-      setPlaybackProgress(0);
-    }
-    // Subtle web audio pop on toggle
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      const osc = audioCtxRef.current.createOscillator();
-      const gain = audioCtxRef.current.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(isPlaying ? 220 : 440, audioCtxRef.current.currentTime);
-      gain.gain.setValueAtTime(0.04, audioCtxRef.current.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + 0.08);
-      osc.connect(gain);
-      gain.connect(audioCtxRef.current.destination);
-      osc.start();
-      osc.stop(audioCtxRef.current.currentTime + 0.08);
-    } catch {}
+    const audio = audioRef.current;
+    if (!audio || !asset) return;
 
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    audio.playbackRate = speed;
+    setIsLoading(true);
+    audio
+      .play()
+      .then(() => {
+        setIsPlaying(true);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleSeek = (index: number) => {
-    const frac = index / waveformHeights.length;
-    setPlaybackProgress(frac);
+    const audio = audioRef.current;
+    if (!audio || !duration || !asset) return;
+    const frac = index / WAVEFORM_HEIGHTS.length;
+    audio.currentTime = frac * duration;
+    setProgress(frac);
   };
 
   const cycleSpeed = () => {
-    if (speed === 1) setSpeed(1.5);
-    else if (speed === 1.5) setSpeed(2);
-    else setSpeed(1);
+    const next = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1;
+    setSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
   };
 
-  const currentSeconds = Math.floor(playbackProgress * durationSeconds);
-  const remainingSeconds = durationSeconds - currentSeconds;
+  const currentSeconds = Math.floor(progress * duration);
+  const totalSeconds = Math.max(0, Math.round(duration));
   const timeDisplay = isPlaying
     ? `0:${currentSeconds.toString().padStart(2, '0')}`
-    : `0:${durationSeconds.toString().padStart(2, '0')}`;
+    : `0:${totalSeconds.toString().padStart(2, '0')}`;
 
   return (
     <div className="flex items-center gap-2.5 py-1 min-w-[210px] max-w-[280px]">
+      {asset && <audio ref={audioRef} src={asset} preload="metadata" />}
+
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95 cursor-pointer ${
+        disabled={!asset}
+        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
           isMine
             ? 'bg-[#F05D48] text-white'
             : 'bg-[#202A30] dark:bg-white text-white dark:text-[#202A30]'
         }`}
         aria-label={isPlaying ? 'Pause' : 'Play voice message'}
       >
-        {isPlaying ? (
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : isPlaying ? (
           <Pause className="w-4 h-4 fill-current" />
         ) : (
           <Play className="w-4 h-4 fill-current ml-0.5" />
@@ -111,9 +134,9 @@ export const LiveWaveform: React.FC<LiveWaveformProps> = ({
       {/* Waveform track */}
       <div className="flex-1 flex flex-col justify-center">
         <div className="flex items-center gap-[2.5px] h-7 cursor-pointer">
-          {waveformHeights.map((h, i) => {
-            const barFraction = i / waveformHeights.length;
-            const isPlayed = barFraction <= playbackProgress;
+          {WAVEFORM_HEIGHTS.map((h, i) => {
+            const barFraction = i / WAVEFORM_HEIGHTS.length;
+            const isPlayed = barFraction <= progress;
             return (
               <div
                 key={i}

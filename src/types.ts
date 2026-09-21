@@ -9,10 +9,12 @@ export interface MessageReply {
   kind?: MessageKind;
 }
 
-export interface RelayMessage {
+export interface Message {
   id: string;
   senderId: string;
+  senderName?: string;
   sentAt: string;
+  sentAtMs?: number;
   kind: MessageKind;
   text?: string;
   asset?: string;
@@ -23,6 +25,7 @@ export interface RelayMessage {
   reactions?: Record<string, string>; // userId -> emoji
   isDeleted?: boolean;
   isStarred?: boolean;
+  decryptFailed?: boolean;
 }
 
 export interface Conversation {
@@ -31,25 +34,30 @@ export interface Conversation {
   avatarAsset?: string | null;
   lastMessage: string;
   timeLabel: string;
-  lastMessageAt?: string;
+  lastMessageAt?: number;
   online?: boolean;
   unread: number;
   pinned?: boolean;
   isGroup?: boolean;
   muted?: boolean;
+  blocked?: boolean;
   previewKind?: MessageKind;
   delivery?: DeliveryStage;
   recipientId?: string;
+  recipientUsername?: string;
+  participantIds?: string[];
   description?: string;
   members?: string[];
   groupAdmins?: string[];
+  isTyping?: boolean;
 }
 
 export interface UserProfile {
   uid: string;
+  username: string;
+  email: string;
   displayName: string;
   about: string;
-  phoneNumber: string;
   avatarUrl?: string;
   publicKey: string;
   isOnline: boolean;
@@ -79,8 +87,33 @@ export interface AppSettings {
   };
 }
 
-export type AuthStep = 'splash' | 'phone' | 'otp' | 'profile' | 'complete';
+export type AuthStep = 'loading' | 'splash' | 'login' | 'signup' | 'complete';
 
 export type InboxFilter = 'all' | 'unread' | 'groups';
 
 export type DesktopNavTab = 'chats' | 'calls' | 'status' | 'starred' | 'settings';
+
+export type CallType = 'audio' | 'video';
+export type CallStatus =
+  | 'ringing'
+  | 'connecting'
+  | 'connected'
+  | 'ended'
+  | 'declined'
+  | 'missed'
+  | 'failed'
+  | 'busy';
+
+export interface ActiveCall {
+  callId: string;
+  peerId: string;
+  peerName: string;
+  peerAvatar?: string | null;
+  type: CallType;
+  direction: 'outgoing' | 'incoming';
+  status: CallStatus;
+  startedAt?: number;
+  connectedAt?: number;
+  isMuted: boolean;
+  isCameraOff: boolean;
+}

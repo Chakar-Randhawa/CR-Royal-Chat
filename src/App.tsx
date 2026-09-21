@@ -4,11 +4,12 @@ import { AuthFlow } from './components/auth/AuthFlow';
 import { ChatListPage } from './components/chat/ChatListPage';
 import { ConversationView } from './components/chat/ConversationView';
 import { SettingsView } from './components/settings/SettingsView';
-import { RelayDesktopNavRail } from './components/desktop/RelayDesktopNavRail';
-import { RelayDesktopDetailPane } from './components/desktop/RelayDesktopDetailPane';
+import { RoyalChatDesktopNavRail } from './components/desktop/RoyalChatDesktopNavRail';
+import { RoyalChatDesktopDetailPane } from './components/desktop/RoyalChatDesktopDetailPane';
 import { CallsPane, StatusPane, StarredPane } from './components/desktop/AuxiliaryPanes';
-import { RelayToastContainer } from './components/common/RelayToast';
+import { RoyalChatToastContainer } from './components/common/RoyalChatToast';
 import { InAppNotificationBanner } from './components/common/InAppNotificationBanner';
+import { CallOverlay } from './components/common/CallOverlay';
 
 export const App: React.FC = () => {
   const {
@@ -34,12 +35,21 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Checking Firebase Auth session on load
+  if (authStep === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#F8F8F5] dark:bg-[#141B20]">
+        <div className="w-8 h-8 rounded-full border-2 border-[#F05D48] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   // Show Auth Flow if not logged in
   if (authStep !== 'complete') {
     return (
       <>
         <AuthFlow />
-        <RelayToastContainer />
+        <RoyalChatToastContainer />
       </>
     );
   }
@@ -51,14 +61,15 @@ export const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8F8F5] dark:bg-[#141B20] text-[#202A30] dark:text-[#F4F5F2]">
       {/* Global Toast & Banner Overlays */}
-      <RelayToastContainer />
+      <RoyalChatToastContainer />
       <InAppNotificationBanner />
+      <CallOverlay />
 
       {isDesktop ? (
         /* ================= DESKTOP 3-PANE SCAFFOLD ================= */
         <div className="flex h-full w-full overflow-hidden">
           {/* 1. Left Nav Rail */}
-          <RelayDesktopNavRail />
+          <RoyalChatDesktopNavRail />
 
           {/* 2. Middle Navigation Pane */}
           <div className="w-80 md:w-96 h-full shrink-0 flex flex-col">
@@ -71,7 +82,7 @@ export const App: React.FC = () => {
 
           {/* 3. Right Detail Pane */}
           <div className="flex-1 h-full overflow-hidden">
-            <RelayDesktopDetailPane />
+            <RoyalChatDesktopDetailPane />
           </div>
         </div>
       ) : (
