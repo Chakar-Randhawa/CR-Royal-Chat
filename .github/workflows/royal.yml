@@ -25,7 +25,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22' # <-- Yahan sirf '20' se badal kar '22' kiya hai aapka error fix karne ke liye
+          node-version: '22'
           cache: 'npm'
 
       - name: Install web app dependencies
@@ -50,8 +50,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # Fix: android-actions/setup-android ko v4 par update kiya aur cmdline-tools specify kiya
+      # Is se 'Failed to find package tools' aur 'sdkmanager failed' ka error khatam ho jayega
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '11.0'
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
