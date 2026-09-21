@@ -1,6 +1,6 @@
 {
-  "name": "relay-functions",
-  "description": "Relay Cloud Functions for Real-Time Push Notifications",
+  "name": "royalchat-functions",
+  "description": "Royal Chat Cloud Functions for Real-Time Push Notifications",
   "version": "1.0.0",
   "engines": {
     "node": "20"

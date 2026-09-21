@@ -20,7 +20,7 @@ exports.onNewMessage = onDocumentCreated(
     const chatId = event.params.chatId;
     const messageId = event.params.messageId;
     const senderId = messageData.senderId;
-    const senderName = messageData.senderName || "Relay Contact";
+    const senderName = messageData.senderName || "Royal Chat Contact";
 
     const db = admin.firestore();
     const messaging = admin.messaging();
@@ -106,7 +106,7 @@ exports.onNewMessage = onDocumentCreated(
             priority: "high",
             notification: {
               sound: "default",
-              channelId: "relay_messages",
+              channelId: "royalchat_messages",
               priority: "max",
             },
           },
