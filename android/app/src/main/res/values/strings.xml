@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Royal Chat</string>
+    <string name="title_activity_main">Royal Chat</string>
+    <string name="package_name">com.royalchat.app</string>
+    <string name="custom_url_scheme">com.royalchat.app</string>
+</resources>
